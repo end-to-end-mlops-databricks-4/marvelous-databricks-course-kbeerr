@@ -1,7 +1,5 @@
 """Configuration file for the project."""
 
-from typing import Any
-
 import yaml
 from pydantic import BaseModel
 

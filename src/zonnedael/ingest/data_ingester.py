@@ -1,15 +1,16 @@
 """Data ingester for Zonnedael dataset."""
-from pyspark.sql import SparkSession
-from pyspark.sql.types import *
+
 import pyspark.sql.functions as F
-from typing import Optional, Union, List
+from pyspark.sql import SparkSession
+from pyspark.sql.types import FloatType, StringType
+
 from zonnedael.config import ProjectConfig
 
-class DataIngester:
-    """A class to ingest data into a Spark DataFrame and upload to Unity Catalog.
-    """
 
-    def __init__(self, base_path: str, config: ProjectConfig, spark: SparkSession):
+class DataIngester:
+    """A class to ingest data into a Spark DataFrame and upload to Unity Catalog."""
+
+    def __init__(self, base_path: str, config: ProjectConfig, spark: SparkSession) -> None:
         """Initialize the DataIngester with file path and name.
 
         :param path: The directory path where the data file is located
@@ -19,25 +20,32 @@ class DataIngester:
         self.config = config
         self.spark = spark
         self.sdf = None
-    
-    def _read_data(self, filename: str, delimiter: str = ";") -> None:
+
+    def _read_data(self, filename: str, delimiter: str = ";", skip_rows: int = 0) -> None:
         """Read the data file into a Spark DataFrame.
 
         :param filename: The name of the data file to be ingested
         :param delimiter: The delimiter used in the CSV file (default is ';')
+        :param skip_rows: Number of rows to skip before the header (default is 0)
         """
-        self.sdf = self.spark.read.options(
-            delimiter=delimiter,
-            header=True,
-            inferSchema=True
-        ).csv(self.base_path + "/" + filename)
+        options = {
+            "delimiter": delimiter,
+            "header": True,
+            "inferSchema": True,
+            "ignoreLeadingWhiteSpace": True,
+            "ignoreTrailingWhiteSpace": True,
+            "comment": "#",
+        }
+        if skip_rows > 0:
+            options["skipRows"] = skip_rows
+        self.sdf = self.spark.read.options(**options).csv(self.base_path + "/" + filename)
 
     def _clean_column_names(self) -> None:
         """Clean column names by replacing spaces with underscores and converting to lowercase."""
         for old_name in self.sdf.columns:
             new_name = old_name.replace(" ", "_").lower()
             self.sdf = self.sdf.withColumnRenamed(old_name, new_name)
-    
+
     def _replace_missing_values(self, missing_value_indicator: str = "#WAARDE!") -> None:
         """Replace specified missing value indicators with None (null) in all columns.
 
@@ -45,29 +53,71 @@ class DataIngester:
         """
         for c in self.sdf.columns:
             self.sdf = self.sdf.withColumn(c, F.regexp_replace(F.col(c), missing_value_indicator, ""))
-    
+
     def _cast_column_types(
-            self,
-            datetime_column: Optional[str] = None,
-            datetime_format: Optional[str] = None,
-            cast_as_float: List[str] = [],
-            cast_as_string: List[str] = [],
-            cast_remaining_as: Union[FloatType, StringType] = StringType
-            ) -> None:
+        self,
+        datetime_column: str | list[str] | None = None,
+        datetime_format: str | None = None,
+        cast_as_float: list[str] | None = None,
+        cast_as_string: list[str] | None = None,
+        cast_remaining_as: type = StringType,
+    ) -> None:
         """Cast columns to appropriate data types.
 
-        :param datetime_column: The name of the datetime column to be converted
-        :param datetime_format: The format string for parsing the datetime column
-        :param cast_remaining_as: The data type to cast remaining columns (default is StringType)
+        :param datetime_column: Name(s) of column(s) to be combined into a datetime.
+            - None: do nothing
+            - str: treat as single datetime column
+            - list[str]: concatenate into one column. Make sure the first element is the date part and the second the time part.
+        :param datetime_format: The format string for parsing the datetime column. If hour is mixed "H" and "HH", use "HH". Function will pad zeroes at hours <10.
+            (e.g. "yyyyMMddHH")
+        :param cast_remaining_as: Type to cast remaining columns (default StringType).
         """
+        if cast_as_float is None:
+            cast_as_float = []
+        if cast_as_string is None:
+            cast_as_string = []
+        # Handle datetime column(s)
+        combined_dt_col = None
         if datetime_column:
-            self.sdf = self.sdf.withColumn(datetime_column, F.to_timestamp(F.col(datetime_column), datetime_format))
+            if isinstance(datetime_column, str):
+                # Single datetime column
+                self.sdf = self.sdf.withColumn(datetime_column, F.to_timestamp(F.col(datetime_column), datetime_format))
+            elif isinstance(datetime_column, list):
+                # This is KMNI-specific handling for separate date and hour columns
+                # But I am not going to modularize this more as this is a one-off ingestion
+                # For a course project, sorry
+
+                # Pad and subtract 1 hour
+                self.sdf = self.sdf.withColumn("hh", F.col("hh").cast("int") - 1)
+
+                # Fix HH=0..23 as 2-digit strings
+                self.sdf = self.sdf.withColumn("hh", F.lpad(F.col("hh").cast("string"), 2, "0"))
+
+                # Combine into timestamp
+                self.sdf = self.sdf.withColumn(
+                    "datetime", F.to_timestamp(F.concat_ws("", F.col("yyyymmdd"), F.col("hh")), "yyyyMMddHH")
+                )
+
+                # Combine multiple columns into one string
+                combined_dt_col = "datetime"
+                self.sdf = self.sdf.withColumn(combined_dt_col, F.concat_ws("", *[F.col(c) for c in datetime_column]))
+                self.sdf = self.sdf.withColumn(combined_dt_col, F.to_timestamp(F.col(combined_dt_col), datetime_format))
+
+                # Drop original datetime parts
+                for c in datetime_column:
+                    self.sdf = self.sdf.drop(c)
+
         for c in self.sdf.columns:
-            if c == datetime_column:
+            if isinstance(datetime_column, str) and c == datetime_column:
                 continue
-            if c in cast_as_float:
+            # keep datetime parts as String if datetime_column is a list
+            elif isinstance(datetime_column, list) and c in datetime_column:
+                self.sdf = self.sdf.withColumn(c, F.col(c).cast(StringType()))
+            elif c == combined_dt_col:
+                continue
+            elif c in cast_as_float:
                 self.sdf = self.sdf.withColumn(c, F.col(c).cast(FloatType()))
-            elif c in cast_as_string:
+            elif c in cast_as_string or c in cast_as_string:
                 self.sdf = self.sdf.withColumn(c, F.col(c).cast(StringType()))
             else:
                 self.sdf = self.sdf.withColumn(c, F.col(c).cast(cast_remaining_as()))
@@ -87,18 +137,19 @@ class DataIngester:
         self.sdf.write.mode(mode).option("overwriteSchema", "true").saveAsTable(f"{catalog}.{schema}.{table_name}")
 
     def ingest(
-            self,
-            filename: str,
-            table_name: str,
-            delimiter: str = ";",
-            missing_value_indicator: str = "#WAARDE!",
-            datetime_column: Optional[str] = None,
-            datetime_format: Optional[str] = None,
-            cast_as_float: List[str] = [],
-            cast_as_string: List[str] = [],
-            cast_remaining_as: Union[FloatType, StringType] = StringType,
-            mode: str = "overwrite"
-            ) -> None:
+        self,
+        filename: str,
+        table_name: str,
+        delimiter: str = ";",
+        missing_value_indicator: str | None = None,
+        datetime_column: str | None = None,
+        datetime_format: str | None = None,
+        cast_as_float: list[str] | None = None,
+        cast_as_string: list[str] | None = None,
+        cast_remaining_as: type = StringType,
+        mode: str = "overwrite",
+        skip_rows: int = 0,
+    ) -> None:
         """Full pipeline to read, clean, and upload data.
 
         :param filename: The name of the data file to be ingested
@@ -112,15 +163,10 @@ class DataIngester:
         :param cast_remaining_as: The data type to cast remaining columns (default is StringType)
         :param mode: The write mode (default is 'overwrite')
         """
-        self._read_data(filename, delimiter)
+        self._read_data(filename, delimiter, skip_rows)
         self._clean_column_names()
-        self._replace_missing_values(missing_value_indicator)
-        self._cast_column_types(
-            datetime_column,
-            datetime_format,
-            cast_as_float,
-            cast_as_string,
-            cast_remaining_as
-        )
+        if missing_value_indicator:
+            self._replace_missing_values(missing_value_indicator)
+        self._cast_column_types(datetime_column, datetime_format, cast_as_float, cast_as_string, cast_remaining_as)
         self._drop_all_null_rows()
         self._upload_to_unity_catalog(table_name, mode)

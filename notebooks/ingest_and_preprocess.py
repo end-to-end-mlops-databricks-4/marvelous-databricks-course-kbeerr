@@ -18,6 +18,8 @@ from pyspark.sql.types import *
 from zonnedael.config import ProjectConfig
 from zonnedael.ingest.data_ingester import DataIngester
 
+from zonnedael.preprocess.preprocess import Preprocessing
+
 config = ProjectConfig.from_yaml(config_path="../project_config.yml", env="dev")
 
 logger.info("Configuration loaded:")
@@ -25,6 +27,8 @@ logger.info(yaml.dump(config, default_flow_style=False))
 
 # COMMAND ----------
 spark = SparkSession.builder.getOrCreate()
+logger.info("Spark session created.")
+# COMMAND ----------
 base_path = "dbfs:/Workspace/Users/kabir.razack@gmail.com/data"
 data_ingester = DataIngester(base_path=base_path, config=config, spark=spark)
 logger.info("DataIngester initialized.")
@@ -52,3 +56,28 @@ data_ingester.ingest(
     mode="overwrite"
 )
 logger.info("Ingestion of 'Zonnedael - slimme meter dataset - 2013 - klanttypering.csv' completed.")
+# COMMAND ----------
+# Ingest KNMI weather data
+data_ingester.ingest(
+    filename="uurgeg_273_2011-2020.txt",
+    table_name="knmi_weather_data_2011_2020",
+    delimiter=",",
+    missing_value_indicator=None,
+    datetime_column=["yyyymmdd", "hh"],
+    datetime_format="yyyyMMddHH",
+    cast_remaining_as=FloatType,
+    mode="overwrite"
+)
+logger.info("Ingestion of 'uurgeg_273_2011-2020.txt' completed.")
+# COMMAND ----------
+preprocessor = Preprocessing(config=config, spark=spark)
+logger.info("Preprocessing initialized.")
+# COMMAND ----------
+# Preprocess targets
+preprocessor.preprocess_targets()
+logger.info("Preprocessing of targets completed.")
+# COMMAND ----------
+# Preprocess features
+preprocessor.preprocess_features()
+logger.info("Preprocessing of features completed.")
+# COMMAND ----------
