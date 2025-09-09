@@ -95,3 +95,13 @@ dmypy.json
 # VS code configuration
 .vscode
 .history
+
+.databricks
+
+# uv
+uv.lock
+
+# data
+data/*
+
+typings
