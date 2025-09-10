@@ -87,15 +87,18 @@ class DataIngester:
                 # But I am not going to modularize this more as this is a one-off ingestion
                 # For a course project, sorry
 
-                # Pad and subtract 1 hour
-                self.sdf = self.sdf.withColumn("hh", F.col("hh").cast("int") - 1)
+                # Pad and subtract 1 hour IF hour is 1-24 instead of 0-23
+                # This is the case in the KNMI data where HH=24 means 00:00 of the next day
+                # Check if HH column contains "24"
+                distinct_hours = [row[0] for row in self.sdf.select("HH").distinct().collect()]
 
+                if 24 in [int(h) for h in distinct_hours if h is not None]:
+                    self.sdf = self.sdf.withColumn(
+                        datetime_column[1], (F.col(datetime_column[1]).cast("int") - 1).cast("int")
+                    )
                 # Fix HH=0..23 as 2-digit strings
-                self.sdf = self.sdf.withColumn("hh", F.lpad(F.col("hh").cast("string"), 2, "0"))
-
-                # Combine into timestamp
                 self.sdf = self.sdf.withColumn(
-                    "datetime", F.to_timestamp(F.concat_ws("", F.col("yyyymmdd"), F.col("hh")), "yyyyMMddHH")
+                    datetime_column[1], F.lpad(F.col(datetime_column[1]).cast("string"), 2, "0")
                 )
 
                 # Combine multiple columns into one string
