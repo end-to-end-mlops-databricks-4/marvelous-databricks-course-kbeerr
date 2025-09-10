@@ -50,9 +50,8 @@ def test_ingest_pipeline(
             assert field_type == "float", f"{col} expected float, got {field_type}"
         elif col in (cast_as_string or []):
             assert field_type == "string", f"{col} expected string, got {field_type}"
-        elif datetime_column and (
-            col == datetime_column if isinstance(datetime_column, str) else col in datetime_column
-        ):
+        # ingestion explicitly creates a datetime column when datetime_column is a list
+        elif (isinstance(datetime_column, list) and col == "datetime") or (isinstance(datetime_column, str) and col == datetime_column):
             assert field_type == "timestamp", f"{col} expected timestamp, got {field_type}"
         else:
             expected_type = "float" if cast_remaining_as == FloatType else "string"
