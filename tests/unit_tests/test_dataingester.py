@@ -57,5 +57,3 @@ def test_ingest_pipeline(
         else:
             expected_type = "float" if cast_remaining_as == FloatType else "string"
             assert field_type == expected_type, f"{col} expected {expected_type}, got {field_type}"
-
-    
