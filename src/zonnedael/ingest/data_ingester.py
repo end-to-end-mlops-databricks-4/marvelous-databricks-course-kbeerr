@@ -152,6 +152,7 @@ class DataIngester:
         cast_remaining_as: type = StringType,
         mode: str = "overwrite",
         skip_rows: int = 0,
+        test_mode: bool = False,
     ) -> None:
         """Full pipeline to read, clean, and upload data.
 
@@ -165,6 +166,8 @@ class DataIngester:
         :param cast_as_string: List of columns to cast as StringType
         :param cast_remaining_as: The data type to cast remaining columns (default is StringType)
         :param mode: The write mode (default is 'overwrite')
+        :param skip_rows: Number of rows to skip before the header (default is 0)
+        :param test_mode: If True, skip uploading to Unity Catalog (default is False)
         """
         self._read_data(filename, delimiter, skip_rows)
         self._clean_column_names()
@@ -172,4 +175,5 @@ class DataIngester:
             self._replace_missing_values(missing_value_indicator)
         self._cast_column_types(datetime_column, datetime_format, cast_as_float, cast_as_string, cast_remaining_as)
         self._drop_all_null_rows()
-        self._upload_to_unity_catalog(table_name, mode)
+        if not test_mode:
+            self._upload_to_unity_catalog(table_name, mode)
