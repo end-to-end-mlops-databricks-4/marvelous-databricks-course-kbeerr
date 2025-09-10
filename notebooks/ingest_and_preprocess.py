@@ -3,21 +3,22 @@
 # MAGIC %pip install -e ..
 # MAGIC %restart_python
 # COMMAND ----------
+import sys
 from pathlib import Path
-import sys, os
-sys.path.append(str(Path.cwd().parent / 'src'))
+
+sys.path.append(str(Path.cwd().parent / "src"))
 # COMMAND ----------
-from loguru import logger
 import yaml
+from loguru import logger
+
 # import sys
 from pyspark.sql import SparkSession
-from pyspark.sql.types import *
+from pyspark.sql.types import FloatType, StringType
+
 # import pyspark.sql.functions as F
 # import pandas as pd
-
 from zonnedael.config import ProjectConfig
 from zonnedael.ingest.data_ingester import DataIngester
-
 from zonnedael.preprocess.preprocess import Preprocessing
 
 config = ProjectConfig.from_yaml(config_path="../project_config.yml", env="dev")
@@ -42,7 +43,7 @@ data_ingester.ingest(
     datetime_column="datetime",
     datetime_format="d-M-yyyy H:mm",
     cast_remaining_as=FloatType,
-    mode="overwrite"
+    mode="overwrite",
 )
 logger.info("Ingestion of 'Zonnedael - slimme meter dataset - 2013 - Levering.csv' completed.")
 # COMMAND ----------
@@ -53,7 +54,7 @@ data_ingester.ingest(
     delimiter=";",
     missing_value_indicator="#WAARDE!",
     cast_remaining_as=StringType,
-    mode="overwrite"
+    mode="overwrite",
 )
 logger.info("Ingestion of 'Zonnedael - slimme meter dataset - 2013 - klanttypering.csv' completed.")
 # COMMAND ----------
@@ -66,7 +67,7 @@ data_ingester.ingest(
     datetime_column=["yyyymmdd", "hh"],
     datetime_format="yyyyMMddHH",
     cast_remaining_as=FloatType,
-    mode="overwrite"
+    mode="overwrite",
 )
 logger.info("Ingestion of 'uurgeg_273_2011-2020.txt' completed.")
 # COMMAND ----------
