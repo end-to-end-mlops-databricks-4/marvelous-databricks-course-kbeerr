@@ -10,7 +10,7 @@ from zonnedael.ingest.data_ingester import DataIngester
 @pytest.mark.parametrize(
     "filename,delimiter,missing_value_indicator,datetime_column,datetime_format,cast_as_float,cast_as_string,cast_remaining_as",
     [
-        ("zonnedael_levering.csv", ";", "datetime", ";", "#WAARDE!", "d-M-yyyy H:mm", None, None, FloatType),
+        ("zonnedael_levering.csv", ";", "#WAARDE!", "datetime", "d-M-yyyy H:mm", None, None, FloatType),
         ("zonnedael_klanttypering.csv", ";", "#WAARDE!", None, None, None, None, StringType),
         ("knmi_weatherdata.txt", ",", None, ["yyyymmdd", "hh"], "yyyyMMddHH", None, None, FloatType),
     ],
