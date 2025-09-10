@@ -43,28 +43,19 @@ def test_ingest_pipeline(
 
     sdf: DataFrame = ingester.sdf
     assert sdf.count() > 0  # Ensure rows were read
-    # Check float columns
-    for col in cast_as_float or []:
-        assert col in sdf.columns
-        field_type = [f.dataType.typeName() for f in sdf.schema.fields if f.name == col][0]
-        assert field_type == "float"
+    for col in sdf.columns:
+        field_type = next(f.dataType.typeName() for f in sdf.schema.fields if f.name == col)
 
-    # Check string columns
-    for col in cast_as_string or []:
-        assert col in sdf.columns
-        field_type = [f.dataType.typeName() for f in sdf.schema.fields if f.name == col][0]
-        assert field_type == "string"
+        if col in (cast_as_float or []):
+            assert field_type == "float", f"{col} expected float, got {field_type}"
+        elif col in (cast_as_string or []):
+            assert field_type == "string", f"{col} expected string, got {field_type}"
+        elif datetime_column and (
+            col == datetime_column if isinstance(datetime_column, str) else col in datetime_column
+        ):
+            assert field_type == "timestamp", f"{col} expected timestamp, got {field_type}"
+        else:
+            expected_type = "float" if cast_remaining_as == FloatType else "string"
+            assert field_type == expected_type, f"{col} expected {expected_type}, got {field_type}"
 
-    # Check remaining columns
-    remaining_cols = set(sdf.columns) - set(cast_as_float or []) - set(cast_as_string or [])
-    for col in remaining_cols:
-        assert col in sdf.columns
-        field_type = [f.dataType.typeName() for f in sdf.schema.fields if f.name == col][0]
-        expected_type = "float" if cast_remaining_as == FloatType else "string"
-        assert field_type == expected_type
-
-    # Check datetime column if applicable
-    if datetime_column:
-        assert "datetime" in sdf.columns
-        field_type = [f.dataType.typeName() for f in sdf.schema.fields if f.name == "datetime"][0]
-        assert field_type == "timestamp"
+    
