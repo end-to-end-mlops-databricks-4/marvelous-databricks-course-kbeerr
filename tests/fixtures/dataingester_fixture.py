@@ -1,13 +1,12 @@
 """Fixtures for tests."""
 
-import pandas as pd
 import pytest
 from loguru import logger
 from pyspark.sql import SparkSession
 
-from zonnedael import PROJECT_DIR
-from zonnedael.config import ProjectConfig, Tags
 from tests.unit_tests.spark_config import spark_config
+from zonnedael import PROJECT_DIR
+from zonnedael.config import ProjectConfig
 from zonnedael.ingest.data_ingester import DataIngester
 
 
@@ -47,8 +46,9 @@ def config() -> ProjectConfig:
     config = ProjectConfig.from_yaml(config_file_path.as_posix())
     return config
 
+
 @pytest.fixture(scope="function")
-def ingester(config, spark_session):
+def ingester(config: ProjectConfig, spark_session: SparkSession) -> DataIngester:
     """Create a DataIngester instance for tests."""
     base_path = str(config.project_dir / "tests" / "test_data")
     return DataIngester(base_path=base_path, config=config, spark=spark_session)

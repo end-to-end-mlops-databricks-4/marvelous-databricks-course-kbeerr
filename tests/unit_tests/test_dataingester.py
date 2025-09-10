@@ -1,19 +1,18 @@
 """Unit tests for DataIngester."""
 
-import pandas as pd
 import pytest
-from tests.conftest import CATALOG_DIR
 from pyspark.sql import DataFrame
-from pyspark.sql import SparkSession
 from pyspark.sql.types import FloatType, StringType
+
 from zonnedael.ingest.data_ingester import DataIngester
+
 
 @pytest.mark.parametrize(
     "filename,delimiter,missing_value_indicator,datetime_column,datetime_format,cast_as_float,cast_as_string,cast_remaining_as",
     [
-        ("zonnedael_levering.csv",";","datetime", ";", "#WAARDE!", "d-M-yyyy H:mm",None,None,FloatType),
-        ("zonnedael_klanttypering.csv", ";","#WAARDE!", None, None, None, None, StringType),
-        ("knmi_weatherdata.txt", ",",None, ["yyyymmdd", "hh"], "yyyyMMddHH", None, None, FloatType),
+        ("zonnedael_levering.csv", ";", "datetime", ";", "#WAARDE!", "d-M-yyyy H:mm", None, None, FloatType),
+        ("zonnedael_klanttypering.csv", ";", "#WAARDE!", None, None, None, None, StringType),
+        ("knmi_weatherdata.txt", ",", None, ["yyyymmdd", "hh"], "yyyyMMddHH", None, None, FloatType),
     ],
 )
 def test_ingest_pipeline(
@@ -26,7 +25,7 @@ def test_ingest_pipeline(
     cast_as_float: list[str] | None,
     cast_as_string: list[str] | None,
     cast_remaining_as: type,
-    ) -> None:
+) -> None:
     """Test full ingest pipeline for each CSV file in test mode."""
     ingester.ingest(
         filename=filename,
