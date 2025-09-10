@@ -50,5 +50,5 @@ def config() -> ProjectConfig:
 @pytest.fixture(scope="function")
 def ingester(config: ProjectConfig, spark_session: SparkSession) -> DataIngester:
     """Create a DataIngester instance for tests."""
-    base_path = str(config.project_dir / "tests" / "test_data")
+    base_path = str(PROJECT_DIR / "tests" / "test_data")
     return DataIngester(base_path=base_path, config=config, spark=spark_session)
