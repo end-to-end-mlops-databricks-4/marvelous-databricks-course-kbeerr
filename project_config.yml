@@ -1,3 +1,44 @@
 dev:
   catalog_name: mlops_dev
   schema_name: kabirraz
+
+prd:
+  catalog_name: mlops_prd
+  schema_name: kabirraz
+acc:
+  catalog_name: mlops_acc
+  schema_name: kabirraz
+
+experiment_name_basic: /Shared/zonnedael-basic
+experiment_name_custom: /Shared/zonnedael-custom
+experiment_name_fe: /Shared/zonnedael-fe
+
+parameters:
+  learning_rate: 0.01
+  n_estimators: 1000
+  max_depth: 6
+
+num_features:
+  - dd
+  - fh
+  - sq
+  - q
+  - dr
+  - rh
+  - u
+
+cat_features:
+  - m
+  - s
+  - o
+  - y
+  - woning_type
+  - bouwjaar
+  - gezinssituatie
+  - month
+  - day
+  - hour
+  - day_of_week
+  - is_weekend
+
+target: target
